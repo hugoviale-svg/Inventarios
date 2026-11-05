@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inventario</title>
+<meta name="theme-color" content="#0b5cad">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1d2330; --muted:#6b7280; --brand:#0b5cad; --ok:#15803d; --warn:#b45309; --line:#e5e7eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151c; --card:#1b202b; --ink:#e7eaf0; --muted:#9aa3b2; --brand:#5aa2f0; --ok:#4ade80; --warn:#fbbf24; --line:#2b3240; }
+  }
+  :root[data-theme="light"] { --bg:#f5f6f8; --card:#fff; --ink:#1d2330; --muted:#6b7280; --brand:#0b5cad; --ok:#15803d; --warn:#b45309; --line:#e5e7eb; }
+  :root[data-theme="dark"] { --bg:#12151c; --card:#1b202b; --ink:#e7eaf0; --muted:#9aa3b2; --brand:#5aa2f0; --ok:#4ade80; --warn:#fbbf24; --line:#2b3240; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  header { position:sticky; top:0; z-index:5; background:var(--brand); color:#fff; padding:12px 16px; display:flex; gap:12px; align-items:center; justify-content:space-between; }
+  header h1 { font-size:18px; margin:0; }
+  nav button { background:transparent; border:1px solid #ffffff88; color:#fff; padding:6px 12px; border-radius:8px; margin-left:6px; }
+  nav button.on { background:#fff; color:var(--brand); }
+  main { padding:12px 16px 96px; max-width:720px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; }
+  select, input[type=text], input[type=number] { width:100%; padding:12px; font-size:18px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--ink); }
+  .seg { display:flex; gap:8px; flex-wrap:wrap; }
+  .seg button { flex:1; padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:16px; }
+  .seg button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .row { display:flex; gap:8px; align-items:center; }
+  .btn { padding:12px 16px; border-radius:10px; border:0; background:var(--brand); color:#fff; font-size:16px; font-weight:600; }
+  .btn.sec { background:transparent; color:var(--brand); border:1px solid var(--brand); }
+  .btn.warn { background:var(--warn); }
+  .btn:disabled { opacity:.5; }
+  .big { font-size:22px; font-weight:700; }
+  .muted { color:var(--muted); font-size:14px; }
+  .totals { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+  .totals div { background:var(--bg); border-radius:10px; padding:10px; text-align:center; }
+  .totals b { display:block; font-size:22px; }
+  #reader { width:100%; border-radius:12px; overflow:hidden; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  td.n, th.n { text-align:right; white-space:nowrap; }
+  .hide { display:none !important; }
+  .toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:#111; color:#fff; padding:12px 16px; border-radius:10px; max-width:90%; z-index:9; }
+  .toast.err { background:#b91c1c; }
+  .bar { position:fixed; bottom:0; left:0; right:0; background:var(--card); border-top:1px solid var(--line); padding:10px 16px; display:flex; gap:8px; justify-content:center; }
+  .bar .btn { flex:1; max-width:340px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Inventario</h1>
+  <nav>
+    <button id="tabContar" class="on" onclick="ir('contar')">Contar</button>
+    <button id="tabResumen" onclick="ir('resumen')">Resumen</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ===== CONTAR ===== -->
+  <section id="vistaContar">
+    <div class="card">
+      <label>Número de inventario</label>
+      <select id="selInv"></select>
+      <label>Usuario</label>
+      <select id="selUsr"></select>
+      <label>Ubicación</label>
+      <div class="seg" id="segUbi">
+        <button data-v="SALON" onclick="setUbi('SALON')">Salón</button>
+        <button data-v="DEPOSITO" onclick="setUbi('DEPOSITO')">Depósito</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <label style="margin:0">Código</label>
+        <label style="margin:0;display:flex;gap:6px;align-items:center">
+          <input type="checkbox" id="chkStock" onchange="toggleStock()"> Mostrar stock
+        </label>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <input type="text" id="txtCodigo" inputmode="numeric" autocomplete="off" placeholder="Escanear o escribir código"
+               onkeydown="if(event.key==='Enter'){buscar(this.value)}">
+        <button class="btn sec" onclick="abrirCamara()">📷</button>
+      </div>
+      <div id="camara" class="hide" style="margin-top:10px">
+        <div id="reader"></div>
+        <button class="btn sec" style="margin-top:8px;width:100%" onclick="cerrarCamara()">Cerrar cámara</button>
+      </div>
+    </div>
+
+    <div class="card hide" id="cardArticulo">
+      <div class="big" id="artDesc">—</div>
+      <div class="muted" id="artEan"></div>
+      <div class="muted hide" id="artStockWrap">Stock día anterior (toda la tienda): <b id="artStock"></b></div>
+      <div class="muted" id="artAviso" style="color:var(--warn)"></div>
+
+      <label>Cantidad</label>
+      <div class="row">
+        <button class="btn sec" onclick="cambiarCant(-1)">−</button>
+        <input type="number" id="txtCant" value="1" min="0" step="1" style="text-align:center"
+               onkeydown="if(event.key==='Enter'){agregar()}">
+        <button class="btn sec" onclick="cambiarCant(1)">+</button>
+      </div>
+      <div style="margin-top:10px">
+        <button class="btn" style="width:100%" onclick="agregar()">Agregar al conteo</button>
+      </div>
+
+      <div class="totals">
+        <div>Este usuario<b id="tUsr">0</b></div>
+        <div><span id="tUbiLbl">Ubicación</span><b id="tUbi">0</b></div>
+        <div>Total general<b id="tGen">0</b></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <strong>Últimos cargados</strong>
+        <button class="btn sec" onclick="deshacer()">Deshacer último</button>
+      </div>
+      <table id="tblRecientes"><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- ===== RESUMEN ===== -->
+  <section id="vistaResumen" class="hide">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <label style="margin:0">Inventario</label>
+        <button class="btn sec" onclick="cargarResumen()">Actualizar</button>
+      </div>
+      <select id="selInvRes" onchange="cargarResumen()"></select>
+      <div class="row" style="margin-top:10px;flex-wrap:wrap">
+        <button class="btn" onclick="descargarExcel()">Descargar Excel</button>
+        <button class="btn sec" onclick="descargarCSV()">Descargar CSV</button>
+      </div>
+    </div>
+    <div class="card" style="overflow-x:auto">
+      <table id="tblResumen">
+        <thead><tr><th>Artículo</th><th class="n">Salón</th><th class="n">Depósito</th><th class="n">Total</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="muted" id="resNota"></p>
+    </div>
+  </section>
+</main>
+
+<div class="toast hide" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+/* ======== CONFIGURACIÓN ======== */
+const API_URL = 'PEGAR_URL_EXEC_DEL_APPS_SCRIPT';
+
+/* ======== ESTADO ======== */
+const S = { inv: '', usr: '', ubi: 'SALON', ean: '', desc: '', stock: null, recientes: [], busy: false };
+let scanner = null;
+let ultimaLectura = { code: '', t: 0 };
+
+/* ======== UTILIDADES ======== */
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast' + (err ? ' err' : '');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hide'), 2600);
+}
+function beep() {
+  try { navigator.vibrate && navigator.vibrate(60); } catch (e) {}
+  try {
+    const c = new (window.AudioContext || window.webkitAudioContext)();
+    const o = c.createOscillator(); o.frequency.value = 1400; o.connect(c.destination);
+    o.start(); setTimeout(() => { o.stop(); c.close(); }, 90);
+  } catch (e) {}
+}
+function guardar(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function leer(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function sinSpinner(on) { S.busy = on; document.body.style.cursor = on ? 'progress' : ''; }
+
+async function api(params) {
+  const url = API_URL + '?' + new URLSearchParams(params).toString();
+  const r = await fetch(url);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Error de servidor');
+  return j;
+}
+async function apiPost(body) {
+  const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Error de servidor');
+  return j;
+}
+
+/* ======== NAVEGACIÓN ======== */
+function ir(v) {
+  const c = v === 'contar';
+  document.getElementById('vistaContar').classList.toggle('hide', !c);
+  document.getElementById('vistaResumen').classList.toggle('hide', c);
+  document.getElementById('tabContar').classList.toggle('on', c);
+  document.getElementById('tabResumen').classList.toggle('on', !c);
+  if (!c) cargarResumen();
+}
+
+/* ======== INICIO ======== */
+async function init() {
+  if (!API_URL || API_URL.startsWith('PEGAR')) { toast('Falta configurar API_URL', true); return; }
+  try {
+    const d = await api({ action: 'init' });
+    const selInv = document.getElementById('selInv');
+    selInv.innerHTML = d.inventarios.map(i => `<option value="${i.numero}">${i.numero} · ${i.descripcion}</option>`).join('');
+    const selUsr = document.getElementById('selUsr');
+    selUsr.innerHTML = '<option value="">— elegir —</option>' + d.usuarios.map(u => `<option>${u}</option>`).join('');
+    document.getElementById('selInvRes').innerHTML = selInv.innerHTML;
+    S.inv = leer('inv') || (d.inventarios[0] && d.inventarios[0].numero) || '';
+    S.usr = leer('usr');
+    S.ubi = leer('ubi') || 'SALON';
+    selInv.value = S.inv; selUsr.value = S.usr;
+    document.getElementById('selInvRes').value = S.inv;
+    setUbi(S.ubi, true);
+    document.getElementById('chkStock').checked = leer('stock') === '1';
+    toggleStock();
+  } catch (e) { toast('No se pudo cargar: ' + e.message, true); }
+}
+
+document.getElementById('selInv').addEventListener('change', e => { S.inv = e.target.value; guardar('inv', S.inv); refrescarTotales(); });
+document.getElementById('selUsr').addEventListener('change', e => { S.usr = e.target.value; guardar('usr', S.usr); refrescarTotales(); });
+
+function setUbi(v, silencioso) {
+  S.ubi = v; guardar('ubi', v);
+  document.querySelectorAll('#segUbi button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  document.getElementById('tUbiLbl').textContent = v === 'SALON' ? 'Salón' : 'Depósito';
+  if (!silencioso) refrescarTotales();
+}
+
+function toggleStock() {
+  const on = document.getElementById('chkStock').checked;
+  guardar('stock', on ? '1' : '0');
+  document.getElementById('artStockWrap').classList.toggle('hide', !on || S.stock === null);
+  document.getElementById('artStock').textContent = S.stock === null ? '—' : S.stock;
+}
+
+/* ======== BUSCAR / CONTAR ======== */
+function requisitos() {
+  if (!S.inv) { toast('Elegí el inventario', true); return false; }
+  if (!S.usr) { toast('Elegí el usuario', true); return false; }
+  return true;
+}
+
+async function buscar(valor) {
+  const code = String(valor || '').replace(/\D/g, '');
+  if (!code) return;
+  if (!requisitos()) return;
+  sinSpinner(true);
+  try {
+    const d = await api({ action: 'buscar', ean: code, inv: S.inv, usr: S.usr, ubi: S.ubi });
+    S.ean = d.ean; S.desc = d.descripcion; S.stock = d.stock;
+    document.getElementById('txtCodigo').value = d.ean;
+    document.getElementById('cardArticulo').classList.remove('hide');
+    document.getElementById('artDesc').textContent = d.descripcion || 'NO ENCONTRADO EN ESTRUCTURA';
+    document.getElementById('artEan').textContent = 'Código: ' + d.ean + ' (' + d.ean.length + ' dígitos)';
+    document.getElementById('artAviso').textContent = d.found ? '' : 'Código no está en la estructura: revisar antes de contar';
+    document.getElementById('txtCant').value = 1;
+    document.getElementById('artStock').textContent = d.stock === null ? 'sin dato' : d.stock;
+    toggleStock();
+    pintarTotales(d);
+    document.getElementById('txtCant').select();
+  } catch (e) { toast(e.message, true); }
+  finally { sinSpinner(false); }
+}
+
+function cambiarCant(d) {
+  const el = document.getElementById('txtCant');
+  el.value = Math.max(0, (Number(el.value) || 0) + d);
+}
+
+async function agregar() {
+  if (!S.ean) { toast('Primero escaneá un código', true); return; }
+  if (!requisitos()) return;
+  const cant = Number(document.getElementById('txtCant').value);
+  if (!(cant > 0)) { toast('Cantidad inválida', true); return; }
+  sinSpinner(true);
+  try {
+    const d = await apiPost({ action: 'agregar', inv: S.inv, usr: S.usr, ubi: S.ubi, ean: S.ean, cantidad: cant });
+    S.recientes.unshift({ ean: d.ean, desc: d.descripcion, cant: cant, ubi: S.ubi });
+    S.recientes = S.recientes.slice(0, 15);
+    pintarRecientes();
+    pintarTotales(d);
+    toast('Agregado: ' + cant + ' × ' + (d.descripcion || d.ean).slice(0, 40));
+    // listo para el siguiente
+    S.ean = ''; document.getElementById('txtCodigo').value = '';
+    document.getElementById('cardArticulo').classList.add('hide');
+    document.getElementById('txtCodigo').focus();
+  } catch (e) { toast(e.message, true); }
+  finally { sinSpinner(false); }
+}
+
+async function deshacer() {
+  if (!requisitos()) return;
+  sinSpinner(true);
+  try {
+    const d = await apiPost({ action: 'deshacer', inv: S.inv, usr: S.usr, ubi: S.ubi });
+    toast(d.borrado ? 'Borrado: ' + d.cantidad + ' × ' + d.ean : 'No hay registros para borrar', !d.borrado);
+    if (d.borrado) { S.recientes.shift(); pintarRecientes(); refrescarTotales(); }
+  } catch (e) { toast(e.message, true); }
+  finally { sinSpinner(false); }
+}
+
+function pintarRecientes() {
+  document.querySelector('#tblRecientes tbody').innerHTML = S.recientes.map(r =>
+    `<tr><td>${r.desc ? r.desc.slice(0, 38) : r.ean}<div class="muted">${r.ean} · ${r.ubi === 'SALON' ? 'Salón' : 'Depósito'}</div></td><td class="n">${r.cant}</td></tr>`
+  ).join('');
+}
+
+/** Refresca los totales del artículo activo (si hay) y los contadores de usuario/ubicación. */
+async function refrescarTotales() {
+  if (!S.inv || !S.usr || !S.ean) return;
+  try {
+    const d = await api({ action: 'buscar', ean: S.ean, inv: S.inv, usr: S.usr, ubi: S.ubi });
+    pintarTotales(d);
+  } catch (e) {}
+}
+
+function pintarTotales(d) {
+  document.getElementById('tUsr').textContent = d.totalUsuarioUbi ?? 0;
+  document.getElementById('tUbi').textContent = d.totalUbi ?? 0;
+  document.getElementById('tGen').textContent = d.totalGeneral ?? 0;
+}
+
+/* ======== CÁMARA ======== */
+async function abrirCamara() {
+  if (!requisitos()) return;
+  document.getElementById('camara').classList.remove('hide');
+  if (scanner) return;
+  scanner = new Html5Qrcode('reader');
+  const formatos = [
+    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.CODABAR,
+  ];
+  try {
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 260, height: 140 }, formatsToSupport: formatos },
+      (texto) => {
+        const ahora = Date.now();
+        if (texto === ultimaLectura.code && ahora - ultimaLectura.t < 2000) return;
+        ultimaLectura = { code: texto, t: ahora };
+        beep();
+        document.getElementById('txtCodigo').value = texto;
+        buscar(texto);
+      },
+      () => {}
+    );
+  } catch (e) { toast('No se pudo abrir la cámara: ' + e, true); cerrarCamara(); }
+}
+
+async function cerrarCamara() {
+  document.getElementById('camara').classList.add('hide');
+  if (scanner) { try { await scanner.stop(); scanner.clear(); } catch (e) {} scanner = null; }
+}
+
+/* ======== RESUMEN Y DESCARGAS ======== */
+let resumenActual = null;
+
+async function cargarResumen() {
+  const inv = document.getElementById('selInvRes').value || S.inv;
+  if (!inv) return;
+  sinSpinner(true);
+  try {
+    const d = await api({ action: 'resumen', inv });
+    resumenActual = d;
+    const filas = d.filas.slice().sort((a, b) => a.desc.localeCompare(b.desc));
+    const tb = document.querySelector('#tblResumen tbody');
+    tb.innerHTML = filas.map(f => `
+      <tr>
+        <td>${f.desc}<div class="muted">${f.ean}</div>
+          ${f.contoSalon ? `<div class="muted">Salón · ${f.contoSalon}</div>` : ''}
+          ${f.contoDeposito ? `<div class="muted">Depósito · ${f.contoDeposito}</div>` : ''}
+        </td>
+        <td class="n">${f.salon}</td><td class="n">${f.deposito}</td><td class="n"><b>${f.total}</b></td>
+      </tr>`).join('') || '<tr><td colspan="4" class="muted">Sin conteos todavía</td></tr>';
+    const tSalon = filas.reduce((s, f) => s + f.salon, 0), tDep = filas.reduce((s, f) => s + f.deposito, 0);
+    document.getElementById('resNota').textContent = `${filas.length} artículos · Salón ${tSalon} · Depósito ${tDep}`;
+  } catch (e) { toast(e.message, true); }
+  finally { sinSpinner(false); }
+}
+
+async function descargarExcel() {
+  const inv = document.getElementById('selInvRes').value || S.inv;
+  sinSpinner(true);
+  try {
+    const d = await api({ action: 'excel', inv });
+    const bin = atob(d.base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    bajar(blob, 'inventario_' + inv + '.xlsx');
+  } catch (e) { toast(e.message, true); }
+  finally { sinSpinner(false); }
+}
+
+function descargarCSV() {
+  if (!resumenActual) { toast('Primero actualizá el resumen', true); return; }
+  const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const lineas = [['EAN','Descripcion','Salon','Deposito','Total','Conto en salon','Conto en deposito'].join(',')]
+    .concat(resumenActual.filas.map(f => [f.ean, f.desc, f.salon, f.deposito, f.total, f.contoSalon, f.contoDeposito].map(esc).join(',')));
+  bajar(new Blob(['﻿' + lineas.join('\n')], { type: 'text/csv;charset=utf-8' }), 'inventario_' + resumenActual.inventario + '.csv');
+}
+
+function bajar(blob, nombre) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+init();
+</script>
+<script>
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+</script>
+</body>
+</html>
